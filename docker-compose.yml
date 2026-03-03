@@ -1,0 +1,31 @@
+﻿name: pyxis-fw
+
+services:
+  backend-app:
+    build:
+      context: .
+      dockerfile: infra/php/Dockerfile
+    container_name: pyxis_backend_app
+    working_dir: /var/www/html
+    volumes:
+      - ./backend:/var/www/html
+      - backend_vendor:/var/www/html/vendor
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8080
+
+  backend-web:
+    image: nginx:1.27-alpine
+    container_name: pyxis_backend_web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./backend:/var/www/html
+      - ./infra/nginx/backend.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend-app
+
+volumes:
+  backend_vendor:
+
