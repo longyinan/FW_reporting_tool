@@ -2,10 +2,10 @@
 
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\DemoController;
+
 Route::get('/', function () {
-    return view('pages.home', ['num' => 1]);
+    return view('welcome');
 });
 
-Route::get('/user', function () {
-    return view('pages.user', ['num' => 1]);
-});
+Route::get('/demo', [DemoController::class, 'index']);
