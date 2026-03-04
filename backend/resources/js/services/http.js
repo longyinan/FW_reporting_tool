@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { startLoading, stopLoading } from './loading';
 
 const http = axios.create({
   headers: { 'X-Requested-With': 'XMLHttpRequest' },
@@ -8,12 +9,17 @@ const http = axios.create({
 http.interceptors.request.use((config) => {
   const token = document.querySelector('meta[name="csrf-token"]')?.content;
   if (token) config.headers['X-CSRF-TOKEN'] = token;
+  if (config?.showLoading !== false) startLoading();
   return config;
 });
 
 http.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (res.config?.showLoading !== false) stopLoading();
+    return res;
+  },
   (err) => {
+    if (err.config?.showLoading !== false) stopLoading();
     if (err.response?.status === 401) {
       window.location.href = '/login';
     }
