@@ -21,7 +21,7 @@ class AnsGraphService
         $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values();
 
         $quotaList = $this->qtpQuotaTable->getList($id);
-        $quotaList->load(['cellInfos:quota_table_id,quota_cell_name,quota_value']);
+        $quotaList->load(['cellInfos:quota_table_id,quota_cell_name,quota_value,num_target_samples,num_collected_samples,num_cut_collected_samples']);
 
         if ($partsNoList->count() < 2) {
             return $quotaList;
