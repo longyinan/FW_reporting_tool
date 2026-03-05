@@ -1,4 +1,4 @@
-﻿FROM php:8.3-fpm-alpine
+FROM php:8.3-fpm-alpine
 
 RUN apk add --no-cache \
     bash \
@@ -12,12 +12,15 @@ RUN apk add --no-cache \
     autoconf \
     g++ \
     make \
-    linux-headers
+    linux-headers \
+    postgresql-dev
 
-RUN docker-php-ext-install pdo pdo_mysql intl mbstring zip
+RUN docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql intl mbstring zip
 
-RUN pecl install redis \
-    && docker-php-ext-enable redis
+RUN pecl install redis xdebug \
+    && docker-php-ext-enable redis xdebug
+
+COPY infra/php/conf.d/xdebug.ini /usr/local/etc/php/conf.d/zz-xdebug.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 

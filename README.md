@@ -18,6 +18,42 @@ docker compose up -d --build
 docker compose exec backend-app composer install
 ```
 
+## Xdebug（Docker）
+
+### ビルド / 再起動
+```bash
+docker compose up -d --build
+```
+
+### インストール確認
+```bash
+docker compose exec backend-app php -m | grep -i xdebug
+docker compose exec backend-app php --ri xdebug
+```
+
+### デバッグ有効化（例）
+```bash
+# PowerShell
+$env:XDEBUG_MODE="debug,develop"; $env:XDEBUG_START_WITH_REQUEST="yes"; docker compose up -d --build
+
+# cmd.exe
+set XDEBUG_MODE=debug,develop&& set XDEBUG_START_WITH_REQUEST=yes&& docker compose up -d --build
+```
+
+### デバッグ無効化（既定値）
+```bash
+# PowerShell
+$env:XDEBUG_MODE="off"; docker compose up -d
+
+# cmd.exe
+set XDEBUG_MODE=off&& docker compose up -d
+```
+
+補足:
+- この compose 設定の既定値は `XDEBUG_MODE=debug,develop` です。
+- IDE 側は `localhost:9003` で待ち受けしてください。
+- 接続先ホストは既定で `host.docker.internal` を使用します。
+
 ## 3) Laravel 環境設定とキー生成（DB 利用時のみ migration）
 ```bash
 cp backend/.env.example backend/.env
@@ -86,4 +122,3 @@ npm run build
 ### 注意点
 - `npm run dev` は開発サーバーでのホットリロード用です。
 - `public/build` の本番用成果物を更新したい場合は `npm run build` を実行してください。
-

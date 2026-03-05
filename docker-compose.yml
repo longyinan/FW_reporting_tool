@@ -14,6 +14,12 @@ services:
       APP_ENV: local
       APP_DEBUG: "true"
       APP_URL: http://localhost:8080
+      XDEBUG_MODE: "${XDEBUG_MODE:-debug,develop}"
+      XDEBUG_START_WITH_REQUEST: "${XDEBUG_START_WITH_REQUEST:-yes}"
+      XDEBUG_CLIENT_HOST: "${XDEBUG_CLIENT_HOST:-host.docker.internal}"
+      XDEBUG_CLIENT_PORT: "${XDEBUG_CLIENT_PORT:-9003}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   backend-web:
     image: nginx:1.27-alpine
