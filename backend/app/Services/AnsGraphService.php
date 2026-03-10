@@ -22,6 +22,11 @@ class AnsGraphService
         $questionList = $this->enqueteService->getQuestionList($ank_id);
 
         $enquete = $this->prjInfo->get($ank_id);
+        $enqueteInfo = [
+            'clean_flag' => $enquete->clean_flag ?? null,
+            'nxs_ank_name' => $enquete->nxs_ank_name ?? null,
+            'nxs_enquete_name' => $enquete->nxs_enquete_name ?? null,
+        ];
         $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
         $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values();
 
@@ -30,6 +35,7 @@ class AnsGraphService
 
         if ($partsNoList->count() < 2) {
             return [
+                'enquete' => $enqueteInfo,
                 'questionList' => $questionList,
                 'quotaList' => $quotaList
             ];
@@ -76,12 +82,13 @@ class AnsGraphService
         }
 
         return [
+            'enquete' => $enqueteInfo,
             'questionList' => $questionList,
             'quotaList' => $quotaList
         ];
     }
 
-    public function showGraph($ank_id, $question)
+    public function showGraph(int $ank_id, array $question)
     {
         $enquete = $this->prjInfo->get($ank_id);
         $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
@@ -99,8 +106,6 @@ class AnsGraphService
             if (!$qCol || !in_array($type, ['SA', 'MA'], true)) {
                 $graphList[] = [
                     'qCol' => $qCol,
-                    'qNo' => $targetQuestion['qNo'] ?? null,
-                    'type' => $type,
                     'total' => 0,
                     'categories' => [],
                 ];
@@ -126,36 +131,63 @@ class AnsGraphService
             foreach ($categories as $category) {
                 $catNo = (int) ($category['catNo'] ?? 0);
                 $count = (int) ($countMap[$catNo] ?? 0);
-                $category['count'] = $count;
-                $category['rate'] = $total > 0 ? round(($count / $total) * 100, 1) : 0;
-                $graphCategories[] = $category;
+                $graphCategories[] = [
+                    'catNo' => $catNo,
+                    'count' => $count,
+                    'rate' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
+                ];
             }
 
             $graphList[] = [
                 'qCol' => $qCol,
-                'qNo' => $targetQuestion['qNo'] ?? null,
-                'name' => $targetQuestion['name'] ?? null,
-                'type' => $type,
                 'total' => $total,
                 'categories' => $graphCategories,
             ];
         }
 
         if ($hasSubQuestions) {
-            return [
-                'qNo' => $question['qNo'] ?? null,
-                'name' => $question['name'] ?? null,
-                'type' => strtoupper((string) ($question['type'] ?? '')),
-                'subQuestions' => $graphList,
-            ];
+            return $graphList;
         }
 
         return $graphList[0] ?? [
             'qCol' => null,
-            'qNo' => $question['qNo'] ?? null,
-            'type' => strtoupper((string) ($question['type'] ?? '')),
             'total' => 0,
             'categories' => [],
         ];
+    }
+
+    public function showFaGraph(int $ank_id, array $data)
+    {
+        $sampleNos = $data['sample_nos'] ?? [];
+        $targetColumn = (string) ($data['target_column'] ?? '');
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $targetColumn)) {
+            return [
+                'target_column' => $targetColumn,
+                'sample_nos' => $sampleNos,
+                'items' => [],
+            ];
+        }
+
+        $enquete = $this->prjInfo->get($ank_id);
+        $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
+        $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values()->all();
+
+        $result = $this->rsAnsData->getFaGraphData(
+            $ank_id,
+            $partsNoList,
+            $targetColumn,
+            $sampleNos
+        );
+
+        $response = [
+            'target_column' => $targetColumn,
+            'items' => $result['items'],
+        ];
+
+        if (array_key_exists('sample_nos', $result)) {
+            $response['sample_nos'] = $result['sample_nos'];
+        }
+
+        return $response;
     }
 }

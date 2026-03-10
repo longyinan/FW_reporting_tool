@@ -40,52 +40,114 @@ class RsAnsData extends Model
             $countMap[(int) $catNo] = 0;
         }
 
-        foreach ($partsNoList as $partNo) {
-            $tableList = $this->getExistTableList($ank_id, (int) $partNo);
-            foreach ($tableList as $tableName) {
-                if (!$this->legacySchema()->hasColumn($tableName, $qCol)) {
+        $tableName = $this->findTableByColumn($ank_id, $partsNoList, $qCol);
+        if ($tableName === null) {
+            return $countMap;
+        }
+
+        if ($type === 'SA') {
+            $rows = DB::connection($this->connection)->table($tableName)
+                ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
+                ->whereIn($qCol, $catNos)
+                ->groupBy($qCol)
+                ->get();
+
+            foreach ($rows as $row) {
+                $catNo = (int) $row->answer_value;
+                $countMap[$catNo] = (int) ($countMap[$catNo] ?? 0) + (int) $row->row_count;
+            }
+
+            return $countMap;
+        }
+
+        $rows = DB::connection($this->connection)->table($tableName)
+            ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
+            ->whereNotNull($qCol)
+            ->where($qCol, '<>', '')
+            ->groupBy($qCol)
+            ->get();
+
+        foreach ($rows as $row) {
+            $rawValue = (string) $row->answer_value;
+            $rowCount = (int) $row->row_count;
+            $binary = str_split($rawValue);
+            foreach ($binary as $index => $bit) {
+                if ((string) $bit !== '1') {
                     continue;
                 }
-
-                if ($type === 'SA') {
-                    $rows = DB::connection($this->connection)->table($tableName)
-                        ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
-                        ->whereIn($qCol, $catNos)
-                        ->groupBy($qCol)
-                        ->get();
-
-                    foreach ($rows as $row) {
-                        $catNo = (int) $row->answer_value;
-                        $countMap[$catNo] = (int) ($countMap[$catNo] ?? 0) + (int) $row->row_count;
-                    }
-
-                    break 2;
-                }
-
-                $rows = DB::connection($this->connection)->table($tableName)
-                    ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
-                    ->whereNotNull($qCol)
-                    ->where($qCol, '<>', '')
-                    ->groupBy($qCol)
-                    ->get();
-
-                foreach ($rows as $row) {
-                    $rawValue = (string) $row->answer_value;
-                    $rowCount = (int) $row->row_count;
-                    $binary = str_split($rawValue);
-                    foreach ($binary as $index => $bit) {
-                        if ((string) $bit !== '1') {
-                            continue;
-                        }
-                        $catNo = $catNos[$index] ?? ($index + 1);
-                        $countMap[$catNo] = (int) ($countMap[$catNo] ?? 0) + $rowCount;
-                    }
-                }
-                break 2;
+                $catNo = $catNos[$index] ?? ($index + 1);
+                $countMap[$catNo] = (int) ($countMap[$catNo] ?? 0) + $rowCount;
             }
         }
 
         return $countMap;
+    }
+
+    public function getFaGraphData(
+        int $ank_id,
+        array $partsNoList,
+        string $targetColumn,
+        array $sampleNos = []
+    ): array {
+        $tableName = $this->findTableByColumn($ank_id, $partsNoList, $targetColumn);
+        if ($tableName === null) {
+            return [
+                'sample_nos' => $sampleNos,
+                'items' => [],
+            ];
+        }
+
+        if (empty($sampleNos)) {
+            $allSampleNos = DB::connection($this->connection)->table($tableName)
+                ->whereNotNull('sample_no')
+                ->orderBy('sample_no')
+                ->pluck('sample_no')
+                ->toArray();
+
+            $pageSampleNos = array_slice($allSampleNos, 0, 10);
+            $rows = empty($pageSampleNos)
+                ? collect()
+                : DB::connection($this->connection)->table($tableName)
+                ->selectRaw(sprintf('sample_no, %s as answer_value', $targetColumn))
+                ->whereIn('sample_no', $pageSampleNos)
+                ->orderBy('sample_no')
+                ->get();
+
+            return [
+                'sample_nos' => $allSampleNos,
+                'items' => $rows->map(fn ($row) => [
+                    'sample_no' => $row->sample_no,
+                    'value' => $row->answer_value,
+                ])->toArray(),
+            ];
+        }
+
+        $rows = DB::connection($this->connection)->table($tableName)
+            ->selectRaw(sprintf('sample_no, %s as answer_value', $targetColumn))
+            ->whereIn('sample_no', $sampleNos)
+            ->orderBy('sample_no')
+            ->get();
+
+        return [
+            'items' => $rows->map(fn ($row) => [
+                'sample_no' => $row->sample_no,
+                'value' => $row->answer_value,
+            ])->toArray(),
+        ];
+    }
+
+    private function findTableByColumn(int $ank_id, array $partsNoList, string $targetColumn): ?string
+    {
+        foreach ($partsNoList as $partNo) {
+            $tableList = $this->getExistTableList($ank_id, (int) $partNo);
+            foreach ($tableList as $tableName) {
+                if ($this->legacySchema()->hasColumn($tableName, $targetColumn)) {
+                    return $tableName;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function legacySchema(): LegacyPostgresSchema

@@ -14,16 +14,15 @@ class ShowGraphRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'question' => ['required', 'array'],
-            'question.type' => ['required', 'string'],
-            'question.qNo' => ['nullable', 'string'],
-            'question.qCol' => ['nullable', 'string'],
-            'question.name' => ['nullable', 'string'],
-            'question.categories' => ['nullable', 'array'],
-            'question.categories.*.catNo' => ['nullable', 'integer'],
-            'question.subQuestions' => ['nullable', 'array'],
-            'question.subQuestions.*' => ['array'],
+            'qCol' => ['nullable', 'string'],
+            'type' => ['nullable', 'string'],
+            'categories' => ['nullable', 'array'],
+            'categories.*.catNo' => ['required_with:categories', 'integer'],
+            'subQuestions' => ['nullable', 'array'],
+            'subQuestions.*.qCol' => ['required_with:subQuestions', 'string'],
+            'subQuestions.*.type' => ['required_with:subQuestions', 'string'],
+            'subQuestions.*.categories' => ['nullable', 'array'],
+            'subQuestions.*.categories.*.catNo' => ['required_with:subQuestions.*.categories', 'integer'],
         ];
     }
 }
-

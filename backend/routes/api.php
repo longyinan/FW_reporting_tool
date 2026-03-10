@@ -16,3 +16,4 @@ Route::get('/demo', function (Request $request) {
 });
 
 Route::post('/ansGraph/{ank_id}/showGraph', [AnsGraphController::class, 'showGraph'])->where('ank_id', '[0-9]+');
+Route::post('/ansGraph/{ank_id}/showFaGraph', [AnsGraphController::class, 'showFaGraph'])->where('ank_id', '[0-9]+');

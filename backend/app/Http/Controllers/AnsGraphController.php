@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ShowGraphRequest;
+use App\Http\Requests\ShowFaGraphRequest;
 use App\Services\AnsGraphService;
 
 class AnsGraphController extends Controller
@@ -16,7 +17,11 @@ class AnsGraphController extends Controller
 
     public function showGraph(ShowGraphRequest $request, int $ank_id)
     {
-        return $this->ansGraphService->showGraph($ank_id, $request->validated('question'));
+        return $this->ansGraphService->showGraph($ank_id, $request->validated());
+    }
+
+    public function showFaGraph(ShowFaGraphRequest $request, int $ank_id)
+    {
+        return $this->ansGraphService->showFaGraph($ank_id, $request->validated());
     }
 }
-

@@ -35,7 +35,7 @@ class AnsGraphServiceTest extends TestCase
         ]);
 
         $enqueteService->shouldReceive('getQuestionList')->once()->with(100)->andReturn([
-            $this->makeQuestion('sc1', 'SC1', 'あなたの性別をお選びください。', 'SA'),
+            $this->makeQuestion('sc1', 'SC1', 'Q1', 'SA'),
         ]);
         $prjInfo->shouldReceive('get')->once()->with(100)->andReturn($enquete);
         $qtpQuotaTable->shouldReceive('getList')->once()->with(100)->andReturn($quotaList);
@@ -45,7 +45,13 @@ class AnsGraphServiceTest extends TestCase
         $result = $service->index(100);
 
         $this->assertSame([
-            $this->makeQuestion('sc1', 'SC1', 'あなたの性別をお選びください。', 'SA'),
+            'clean_flag' => null,
+            'nxs_ank_name' => null,
+            'nxs_enquete_name' => null,
+        ], $result['enquete']);
+
+        $this->assertSame([
+            $this->makeQuestion('sc1', 'SC1', 'Q1', 'SA'),
         ], $result['questionList']);
         $this->assertSame($quotaList, $result['quotaList']);
         $this->assertFalse(isset($result['quotaList'][0]->cellInfos[0]->sc_count));
@@ -67,8 +73,8 @@ class AnsGraphServiceTest extends TestCase
         ]);
 
         $enqueteService->shouldReceive('getQuestionList')->once()->with(200)->andReturn([
-            $this->makeQuestion('sc1', 'SC1', 'あなたの性別をお選びください。', 'SA'),
-            $this->makeQuestion('sc2', 'SC2', 'あなたの年齢をお知らせください。', 'NU'),
+            $this->makeQuestion('sc1', 'SC1', 'Q1', 'SA'),
+            $this->makeQuestion('sc2', 'SC2', 'Q2', 'NU'),
         ]);
         $prjInfo->shouldReceive('get')->once()->with(200)->andReturn($enquete);
         $qtpQuotaTable->shouldReceive('getList')->once()->with(200)->andReturn($quotaList);
@@ -97,8 +103,14 @@ class AnsGraphServiceTest extends TestCase
         $result = $service->index(200);
 
         $this->assertSame([
-            $this->makeQuestion('sc1', 'SC1', 'あなたの性別をお選びください。', 'SA'),
-            $this->makeQuestion('sc2', 'SC2', 'あなたの年齢をお知らせください。', 'NU'),
+            'clean_flag' => null,
+            'nxs_ank_name' => null,
+            'nxs_enquete_name' => null,
+        ], $result['enquete']);
+
+        $this->assertSame([
+            $this->makeQuestion('sc1', 'SC1', 'Q1', 'SA'),
+            $this->makeQuestion('sc2', 'SC2', 'Q2', 'NU'),
         ], $result['questionList']);
         $cell1 = $result['quotaList'][0]->cellInfos[0];
         $cell2 = $result['quotaList'][0]->cellInfos[1];
@@ -131,7 +143,7 @@ class AnsGraphServiceTest extends TestCase
         ]);
 
         $enqueteService->shouldReceive('getQuestionList')->once()->with(300)->andReturn([
-            $this->makeQuestion('scx', 'SCX', 'あなたの居住地をお知らせください。', 'SA'),
+            $this->makeQuestion('scx', 'SCX', 'QX', 'SA'),
         ]);
         $prjInfo->shouldReceive('get')->once()->with(300)->andReturn($enquete);
         $qtpQuotaTable->shouldReceive('getList')->once()->with(300)->andReturn($quotaList);
@@ -162,7 +174,13 @@ class AnsGraphServiceTest extends TestCase
         $result = $service->index(300);
 
         $this->assertSame([
-            $this->makeQuestion('scx', 'SCX', 'あなたの居住地をお知らせください。', 'SA'),
+            'clean_flag' => null,
+            'nxs_ank_name' => null,
+            'nxs_enquete_name' => null,
+        ], $result['enquete']);
+
+        $this->assertSame([
+            $this->makeQuestion('scx', 'SCX', 'QX', 'SA'),
         ], $result['questionList']);
         $cell1 = $result['quotaList'][0]->cellInfos[0];
         $cell2 = $result['quotaList'][0]->cellInfos[1];
@@ -204,8 +222,9 @@ class AnsGraphServiceTest extends TestCase
         $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
         $result = $service->showGraph(400, $this->makeGraphQuestion('sc1', 'SC1', 'SA', [1, 2]));
 
-        $this->assertSame('SC1', $result['qNo']);
+        $this->assertSame('sc1', $result['qCol']);
         $this->assertSame(4, $result['total']);
+        $this->assertSame(1, $result['categories'][0]['catNo']);
         $this->assertSame(75.0, $result['categories'][0]['rate']);
         $this->assertSame(25.0, $result['categories'][1]['rate']);
     }
@@ -253,12 +272,78 @@ class AnsGraphServiceTest extends TestCase
 
         $result = $service->showGraph(500, $question);
 
-        $this->assertSame('QG1', $result['qNo']);
-        $this->assertCount(2, $result['subQuestions']);
-        $this->assertSame('QG1_1', $result['subQuestions'][0]['qNo']);
-        $this->assertSame(50.0, $result['subQuestions'][0]['categories'][0]['rate']);
-        $this->assertSame('QG1_2', $result['subQuestions'][1]['qNo']);
-        $this->assertSame(75.0, $result['subQuestions'][1]['categories'][0]['rate']);
+        $this->assertCount(2, $result);
+        $this->assertSame('qg1_1', $result[0]['qCol']);
+        $this->assertSame(50.0, $result[0]['categories'][0]['rate']);
+        $this->assertSame('qg1_2', $result[1]['qCol']);
+        $this->assertSame(75.0, $result[1]['categories'][0]['rate']);
+    }
+
+    public function test_show_fa_graph_returns_first_page_when_sample_nos_is_empty(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $prjInfo->shouldReceive('get')->once()->with(600)->andReturn(new FakeEnquete([1]));
+        $rsAnsData->shouldReceive('getFaGraphData')->once()->with(
+            600,
+            [1],
+            'sc1_2',
+            []
+        )->andReturn([
+            'sample_nos' => [1001, 1002, 1003],
+            'items' => [
+                ['sample_no' => 1001, 'value' => 'text1'],
+                ['sample_no' => 1002, 'value' => 'text2'],
+            ],
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showFaGraph(600, [
+            'target_column' => 'sc1_2',
+            'sample_nos' => [],
+        ]);
+
+        $this->assertSame('sc1_2', $result['target_column']);
+        $this->assertSame([1001, 1002, 1003], $result['sample_nos']);
+        $this->assertSame(2, count($result['items']));
+        $this->assertArrayNotHasKey('pagination', $result);
+    }
+
+    public function test_show_fa_graph_returns_all_rows_when_sample_nos_given(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $prjInfo->shouldReceive('get')->once()->with(700)->andReturn(new FakeEnquete([2]));
+        $rsAnsData->shouldReceive('getFaGraphData')->once()->with(
+            700,
+            [2],
+            'qg1_1_1',
+            [2001, 2002]
+        )->andReturn([
+            'items' => [
+                ['sample_no' => 2001, 'value' => 'fa-a'],
+                ['sample_no' => 2002, 'value' => 'fa-b'],
+            ],
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showFaGraph(700, [
+            'target_column' => 'qg1_1_1',
+            'sample_nos' => [2001, 2002],
+        ]);
+
+        $this->assertSame('qg1_1_1', $result['target_column']);
+        $this->assertArrayNotHasKey('sample_nos', $result);
+        $this->assertSame('fa-a', $result['items'][0]['value']);
+        $this->assertArrayNotHasKey('pagination', $result);
     }
 
     private function makeQuotaTable(string $quotaParam, int $valueType, array $cellValues): object
@@ -326,3 +411,5 @@ class FakeQuotaList extends EloquentCollection
         return $this;
     }
 }
+
+
