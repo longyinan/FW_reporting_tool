@@ -15,8 +15,8 @@ class ShowFaGraphRequest extends FormRequest
     {
         return [
             'target_column' => ['required', 'string', 'regex:/^[A-Za-z_][A-Za-z0-9_]*$/'],
-            'sample_nos' => ['nullable', 'array'],
-            'sample_nos.*' => ['integer'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

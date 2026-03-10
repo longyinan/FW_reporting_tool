@@ -158,12 +158,17 @@ class AnsGraphService
 
     public function showFaGraph(int $ank_id, array $data)
     {
-        $sampleNos = $data['sample_nos'] ?? [];
         $targetColumn = (string) ($data['target_column'] ?? '');
+        $page = (int) ($data['page'] ?? 1);
+        $perPage = (int) ($data['per_page'] ?? 10);
         if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $targetColumn)) {
             return [
-                'sample_nos' => $sampleNos,
                 'items' => [],
+                'pagination' => [
+                    'page' => max($page, 1),
+                    'per_page' => max($perPage, 1),
+                    'total' => 0,
+                ],
             ];
         }
 
@@ -175,17 +180,13 @@ class AnsGraphService
             $ank_id,
             $partsNoList,
             $targetColumn,
-            $sampleNos
+            $page,
+            $perPage
         );
 
-        $response = [
+        return [
             'items' => $result['items'],
+            'pagination' => $result['pagination'],
         ];
-
-        if (array_key_exists('sample_nos', $result)) {
-            $response['sample_nos'] = $result['sample_nos'];
-        }
-
-        return $response;
     }
 }

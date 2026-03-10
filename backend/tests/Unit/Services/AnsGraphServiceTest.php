@@ -279,7 +279,7 @@ class AnsGraphServiceTest extends TestCase
         $this->assertSame(75.0, $result[1]['categories'][0]['rate']);
     }
 
-    public function test_show_fa_graph_returns_first_page_when_sample_nos_is_empty(): void
+    public function test_show_fa_graph_returns_first_page_with_default_pagination(): void
     {
         $prjInfo = Mockery::mock(PrjInfo::class);
         $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
@@ -292,28 +292,32 @@ class AnsGraphServiceTest extends TestCase
             600,
             [1],
             'sc1_2',
-            []
+            1,
+            10
         )->andReturn([
-            'sample_nos' => [1001, 1002, 1003],
             'items' => [
                 ['sample_no' => 1001, 'value' => 'text1'],
                 ['sample_no' => 1002, 'value' => 'text2'],
+            ],
+            'pagination' => [
+                'page' => 1,
+                'per_page' => 10,
+                'total' => 32,
             ],
         ]);
 
         $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
         $result = $service->showFaGraph(600, [
             'target_column' => 'sc1_2',
-            'sample_nos' => [],
         ]);
 
         $this->assertArrayNotHasKey('target_column', $result);
-        $this->assertSame([1001, 1002, 1003], $result['sample_nos']);
+        $this->assertArrayNotHasKey('sample_nos', $result);
         $this->assertSame(2, count($result['items']));
-        $this->assertArrayNotHasKey('pagination', $result);
+        $this->assertSame(32, $result['pagination']['total']);
     }
 
-    public function test_show_fa_graph_returns_all_rows_when_sample_nos_given(): void
+    public function test_show_fa_graph_returns_requested_page(): void
     {
         $prjInfo = Mockery::mock(PrjInfo::class);
         $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
@@ -326,24 +330,31 @@ class AnsGraphServiceTest extends TestCase
             700,
             [2],
             'qg1_1_1',
-            [2001, 2002]
+            2,
+            20
         )->andReturn([
             'items' => [
-                ['sample_no' => 2001, 'value' => 'fa-a'],
-                ['sample_no' => 2002, 'value' => 'fa-b'],
+                ['sample_no' => 2021, 'value' => 'fa-a'],
+                ['sample_no' => 2022, 'value' => 'fa-b'],
+            ],
+            'pagination' => [
+                'page' => 2,
+                'per_page' => 20,
+                'total' => 88,
             ],
         ]);
 
         $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
         $result = $service->showFaGraph(700, [
             'target_column' => 'qg1_1_1',
-            'sample_nos' => [2001, 2002],
+            'page' => 2,
+            'per_page' => 20,
         ]);
 
         $this->assertArrayNotHasKey('target_column', $result);
         $this->assertArrayNotHasKey('sample_nos', $result);
         $this->assertSame('fa-a', $result['items'][0]['value']);
-        $this->assertArrayNotHasKey('pagination', $result);
+        $this->assertSame(2, $result['pagination']['page']);
     }
 
     private function makeQuotaTable(string $quotaParam, int $valueType, array $cellValues): object

@@ -87,52 +87,42 @@ class RsAnsData extends Model
         int $ank_id,
         array $partsNoList,
         string $targetColumn,
-        array $sampleNos = []
+        int $page = 1,
+        int $perPage = 10
     ): array {
         $tableName = $this->findTableByColumn($ank_id, $partsNoList, $targetColumn);
+        $page = max($page, 1);
+        $perPage = max($perPage, 1);
+
         if ($tableName === null) {
             return [
-                'sample_nos' => $sampleNos,
                 'items' => [],
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                ],
             ];
         }
 
-        if (empty($sampleNos)) {
-            $allSampleNos = DB::connection($this->connection)->table($tableName)
-                ->whereNotNull('sample_no')
-                ->orderBy('sample_no')
-                ->pluck('sample_no')
-                ->toArray();
-
-            $pageSampleNos = array_slice($allSampleNos, 0, 10);
-            $rows = empty($pageSampleNos)
-                ? collect()
-                : DB::connection($this->connection)->table($tableName)
-                ->selectRaw(sprintf('sample_no, %s as answer_value', $targetColumn))
-                ->whereIn('sample_no', $pageSampleNos)
-                ->orderBy('sample_no')
-                ->get();
-
-            return [
-                'sample_nos' => $allSampleNos,
-                'items' => $rows->map(fn ($row) => [
-                    'sample_no' => $row->sample_no,
-                    'value' => $row->answer_value,
-                ])->toArray(),
-            ];
-        }
-
-        $rows = DB::connection($this->connection)->table($tableName)
+        $baseQuery = DB::connection($this->connection)->table($tableName)
             ->selectRaw(sprintf('sample_no, %s as answer_value', $targetColumn))
-            ->whereIn('sample_no', $sampleNos)
+            ->whereNotNull('sample_no')
             ->orderBy('sample_no')
-            ->get();
+            ;
+        $total = (clone $baseQuery)->count();
+        $rows = $baseQuery->forPage($page, $perPage)->get();
 
         return [
             'items' => $rows->map(fn ($row) => [
                 'sample_no' => $row->sample_no,
                 'value' => $row->answer_value,
             ])->toArray(),
+            'pagination' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+            ],
         ];
     }
 
