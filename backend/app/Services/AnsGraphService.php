@@ -162,7 +162,6 @@ class AnsGraphService
         $targetColumn = (string) ($data['target_column'] ?? '');
         if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $targetColumn)) {
             return [
-                'target_column' => $targetColumn,
                 'sample_nos' => $sampleNos,
                 'items' => [],
             ];
@@ -180,7 +179,6 @@ class AnsGraphService
         );
 
         $response = [
-            'target_column' => $targetColumn,
             'items' => $result['items'],
         ];
 

@@ -307,7 +307,7 @@ class AnsGraphServiceTest extends TestCase
             'sample_nos' => [],
         ]);
 
-        $this->assertSame('sc1_2', $result['target_column']);
+        $this->assertArrayNotHasKey('target_column', $result);
         $this->assertSame([1001, 1002, 1003], $result['sample_nos']);
         $this->assertSame(2, count($result['items']));
         $this->assertArrayNotHasKey('pagination', $result);
@@ -340,7 +340,7 @@ class AnsGraphServiceTest extends TestCase
             'sample_nos' => [2001, 2002],
         ]);
 
-        $this->assertSame('qg1_1_1', $result['target_column']);
+        $this->assertArrayNotHasKey('target_column', $result);
         $this->assertArrayNotHasKey('sample_nos', $result);
         $this->assertSame('fa-a', $result['items'][0]['value']);
         $this->assertArrayNotHasKey('pagination', $result);
