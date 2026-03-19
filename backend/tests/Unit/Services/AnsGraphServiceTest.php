@@ -357,6 +357,127 @@ class AnsGraphServiceTest extends TestCase
         $this->assertSame(2, $result['pagination']['page']);
     }
 
+    public function test_show_cross_returns_single_cross_table(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $questionList = [
+            $this->makeGraphQuestion('f2', 'F2', 'SA', [1, 2]),
+            $this->makeGraphQuestion('f1', 'F1', 'SA', [1, 2]),
+        ];
+
+        $enqueteService->shouldReceive('getQuestionList')->once()->with(800)->andReturn($questionList);
+        $prjInfo->shouldReceive('get')->once()->with(800)->andReturn(new FakeEnquete([1]));
+        $rsAnsData->shouldReceive('getCrossCountMatrix')->once()->with(
+            800,
+            [1],
+            'f2',
+            'SA',
+            [1, 2],
+            'f1',
+            'SA',
+            [1, 2]
+        )->andReturn([
+            'matrix' => [
+                1 => [1 => 33, 2 => 9],
+                2 => [1 => 3, 2 => 15],
+            ],
+            'row_totals' => [
+                1 => 42,
+                2 => 18,
+            ],
+            'total' => 60,
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showCross(800, 'F2', 'F1');
+
+        $this->assertCount(1, $result);
+        $this->assertSame('f2', $result[0]['sideQCol']);
+        $this->assertSame('F2', $result[0]['sideName']);
+        $this->assertNull($result[0]['sideGroupName']);
+        $this->assertSame('f1', $result[0]['headQCol']);
+        $this->assertSame('F1', $result[0]['headName']);
+        $this->assertNull($result[0]['headGroupName']);
+        $this->assertSame('cat1', $result[0]['headCatNames'][0]['name']);
+        $this->assertSame(60, $result[0]['total']);
+        $this->assertSame(42, $result[0]['rows'][0]['count']);
+        $this->assertSame('cat1', $result[0]['rows'][0]['name']);
+        $this->assertArrayNotHasKey('name', $result[0]['rows'][0]['cells'][0]);
+        $this->assertSame(78.6, $result[0]['rows'][0]['cells'][0]['rate']);
+    }
+
+    public function test_show_cross_expands_sub_questions_to_multi_tables(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $questionList = [
+            [
+                'qNo' => 'SQ',
+                'name' => 'group-side',
+                'subQuestions' => [
+                    $this->makeGraphQuestion('sq1', 'SQ1', 'SA', [1, 2]),
+                    $this->makeGraphQuestion('sq2', 'SQ2', 'SA', [1, 2]),
+                ],
+            ],
+            [
+                'qNo' => 'HQ',
+                'name' => 'group-head',
+                'subQuestions' => [
+                    $this->makeGraphQuestion('hq1', 'HQ1', 'SA', [1, 2]),
+                    $this->makeGraphQuestion('hq2', 'HQ2', 'SA', [1, 2]),
+                ],
+            ],
+        ];
+
+        $enqueteService->shouldReceive('getQuestionList')->once()->with(900)->andReturn($questionList);
+        $prjInfo->shouldReceive('get')->once()->with(900)->andReturn(new FakeEnquete([2]));
+
+        foreach ([['sq1', 'hq1'], ['sq1', 'hq2'], ['sq2', 'hq1'], ['sq2', 'hq2']] as [$sideQCol, $headQCol]) {
+            $rsAnsData->shouldReceive('getCrossCountMatrix')->once()->with(
+                900,
+                [2],
+                $sideQCol,
+                'SA',
+                [1, 2],
+                $headQCol,
+                'SA',
+                [1, 2]
+            )->andReturn([
+                'matrix' => [
+                    1 => [1 => 1, 2 => 0],
+                    2 => [1 => 0, 2 => 1],
+                ],
+                'row_totals' => [
+                    1 => 1,
+                    2 => 1,
+                ],
+                'total' => 2,
+            ]);
+        }
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showCross(900, 'SQ', 'HQ');
+
+        $this->assertCount(4, $result);
+        $this->assertSame('group-side', $result[0]['sideGroupName']);
+        $this->assertSame('group-head', $result[0]['headGroupName']);
+        $this->assertSame('sq1', $result[0]['sideQCol']);
+        $this->assertSame('SQ1', $result[0]['sideName']);
+        $this->assertSame('hq1', $result[0]['headQCol']);
+        $this->assertSame('HQ1', $result[0]['headName']);
+        $this->assertSame('sq2', $result[3]['sideQCol']);
+        $this->assertSame('hq2', $result[3]['headQCol']);
+    }
+
     private function makeQuotaTable(string $quotaParam, int $valueType, array $cellValues): object
     {
         $table = new \stdClass();

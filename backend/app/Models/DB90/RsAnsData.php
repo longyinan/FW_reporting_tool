@@ -126,6 +126,59 @@ class RsAnsData extends Model
         ];
     }
 
+    public function getCrossCountMatrix(
+        int $ank_id,
+        array $partsNoList,
+        string $sideQCol,
+        string $sideType,
+        array $sideCatNos,
+        string $headQCol,
+        string $headType,
+        array $headCatNos
+    ): array {
+        $matrix = [];
+        $rowTotals = [];
+        foreach ($sideCatNos as $sideCatNo) {
+            $sideCatNo = (int) $sideCatNo;
+            $rowTotals[$sideCatNo] = 0;
+            foreach ($headCatNos as $headCatNo) {
+                $matrix[$sideCatNo][(int) $headCatNo] = 0;
+            }
+        }
+
+        $sideTable = $this->findTableByColumn($ank_id, $partsNoList, $sideQCol);
+        $headTable = $this->findTableByColumn($ank_id, $partsNoList, $headQCol);
+        if ($sideTable === null || $headTable === null) {
+            return [
+                'matrix' => $matrix,
+                'row_totals' => $rowTotals,
+                'total' => 0,
+            ];
+        }
+
+        $answerPairs = $this->getCrossAnswerPairs($sideTable, $sideQCol, $headTable, $headQCol);
+        foreach ($answerPairs as $answerPair) {
+            $sideSelected = $this->extractSelectedCatNos($answerPair['side_value'] ?? null, $sideType, $sideCatNos);
+            $headSelected = $this->extractSelectedCatNos($answerPair['head_value'] ?? null, $headType, $headCatNos);
+            if (empty($sideSelected) || empty($headSelected)) {
+                continue;
+            }
+
+            foreach ($sideSelected as $sideCatNo) {
+                foreach ($headSelected as $headCatNo) {
+                    $matrix[$sideCatNo][$headCatNo] = (int) ($matrix[$sideCatNo][$headCatNo] ?? 0) + 1;
+                    $rowTotals[$sideCatNo] = (int) ($rowTotals[$sideCatNo] ?? 0) + 1;
+                }
+            }
+        }
+
+        return [
+            'matrix' => $matrix,
+            'row_totals' => $rowTotals,
+            'total' => array_sum($rowTotals),
+        ];
+    }
+
     private function findTableByColumn(int $ank_id, array $partsNoList, string $targetColumn): ?string
     {
         foreach ($partsNoList as $partNo) {
@@ -138,6 +191,52 @@ class RsAnsData extends Model
         }
 
         return null;
+    }
+
+    private function getCrossAnswerPairs(string $sideTable, string $sideQCol, string $headTable, string $headQCol): array
+    {
+        if ($sideTable === $headTable) {
+            $builder = DB::connection($this->connection)->table($sideTable);
+            $sampleNoColumn = 'sample_no';
+        } else {
+            $builder = DB::connection($this->connection)->table(sprintf('%s as side_table', $sideTable))
+                ->join(sprintf('%s as head_table', $headTable), 'side_table.sample_no', '=', 'head_table.sample_no');
+            $sampleNoColumn = 'side_table.sample_no';
+        }
+
+        return $builder
+            ->selectRaw(sprintf('%s as side_value, %s as head_value', $sideQCol, $headQCol))
+            ->whereNotNull($sampleNoColumn)
+            ->get()
+            ->map(fn ($row) => [
+                'side_value' => $row->side_value,
+                'head_value' => $row->head_value,
+            ])
+            ->toArray();
+    }
+
+    private function extractSelectedCatNos($rawValue, string $type, array $catNos): array
+    {
+        if ($rawValue === null || $rawValue === '') {
+            return [];
+        }
+
+        if (strtoupper($type) === 'SA') {
+            $selected = (int) $rawValue;
+            return in_array($selected, $catNos, true) ? [$selected] : [];
+        }
+
+        $selectedCatNos = [];
+        $binary = str_split((string) $rawValue);
+        foreach ($binary as $index => $bit) {
+            if ((string) $bit !== '1') {
+                continue;
+            }
+
+            $selectedCatNos[] = (int) ($catNos[$index] ?? ($index + 1));
+        }
+
+        return $selectedCatNos;
     }
 
     private function legacySchema(): LegacyPostgresSchema

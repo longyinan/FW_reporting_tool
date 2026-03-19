@@ -79,6 +79,79 @@ class RsAnsDataTest extends TestCase
         ], $result);
     }
 
+    public function test_get_cross_count_matrix_counts_same_table_intersections(): void
+    {
+        $dbFacade = Mockery::mock('alias:Illuminate\Support\Facades\DB');
+        $connection = Mockery::mock();
+        $builder = Mockery::mock();
+
+        $dbFacade->shouldReceive('connection')->once()->with('db90')->andReturn($connection);
+        $connection->shouldReceive('table')->once()->with('rs_ansdata_30_1_1')->andReturn($builder);
+        $builder->shouldReceive('selectRaw')->once()->with('f2 as side_value, f1 as head_value')->andReturnSelf();
+        $builder->shouldReceive('whereNotNull')->once()->with('sample_no')->andReturnSelf();
+        $builder->shouldReceive('get')->once()->andReturn(collect([
+            (object) ['side_value' => 1, 'head_value' => 1],
+            (object) ['side_value' => 1, 'head_value' => 2],
+            (object) ['side_value' => 2, 'head_value' => 2],
+        ]));
+
+        $legacySchema = Mockery::mock(LegacyPostgresSchema::class);
+        $legacySchema->shouldReceive('hasColumn')->once()->with('rs_ansdata_30_1_1', 'f2')->andReturn(true);
+        $legacySchema->shouldReceive('hasColumn')->once()->with('rs_ansdata_30_1_1', 'f1')->andReturn(true);
+
+        $model = Mockery::mock(RsAnsData::class)->makePartial();
+        $model->shouldReceive('getExistTableList')->twice()->andReturn(['rs_ansdata_30_1_1']);
+        $this->injectLegacySchema($model, $legacySchema);
+
+        $result = $model->getCrossCountMatrix(30, [1], 'f2', 'SA', [1, 2], 'f1', 'SA', [1, 2]);
+
+        $this->assertSame(3, $result['total']);
+        $this->assertSame(2, $result['row_totals'][1]);
+        $this->assertSame(1, $result['matrix'][1][1]);
+        $this->assertSame(1, $result['matrix'][1][2]);
+        $this->assertSame(1, $result['matrix'][2][2]);
+    }
+
+    public function test_get_cross_count_matrix_joins_head_table_when_tables_differ(): void
+    {
+        $dbFacade = Mockery::mock('alias:Illuminate\Support\Facades\DB');
+        $connection = Mockery::mock();
+        $builder = Mockery::mock();
+
+        $dbFacade->shouldReceive('connection')->once()->with('db90')->andReturn($connection);
+        $connection->shouldReceive('table')->once()->with('rs_ansdata_40_1_1 as side_table')->andReturn($builder);
+        $builder->shouldReceive('join')->once()->with(
+            'rs_ansdata_40_2_1 as head_table',
+            'side_table.sample_no',
+            '=',
+            'head_table.sample_no'
+        )->andReturnSelf();
+        $builder->shouldReceive('selectRaw')->once()->with(
+            'f2 as side_value, f1 as head_value'
+        )->andReturnSelf();
+        $builder->shouldReceive('whereNotNull')->once()->with('side_table.sample_no')->andReturnSelf();
+        $builder->shouldReceive('get')->once()->andReturn(collect([
+            (object) ['side_value' => 1, 'head_value' => 2],
+            (object) ['side_value' => 2, 'head_value' => 1],
+        ]));
+
+        $legacySchema = Mockery::mock(LegacyPostgresSchema::class);
+        $legacySchema->shouldReceive('hasColumn')->once()->with('rs_ansdata_40_1_1', 'f2')->andReturn(true);
+        $legacySchema->shouldReceive('hasColumn')->once()->with('rs_ansdata_40_1_1', 'f1')->andReturn(false);
+        $legacySchema->shouldReceive('hasColumn')->once()->with('rs_ansdata_40_2_1', 'f1')->andReturn(true);
+
+        $model = Mockery::mock(RsAnsData::class)->makePartial();
+        $model->shouldReceive('getExistTableList')->with(40, 1)->andReturn(['rs_ansdata_40_1_1']);
+        $model->shouldReceive('getExistTableList')->with(40, 2)->andReturn(['rs_ansdata_40_2_1']);
+        $this->injectLegacySchema($model, $legacySchema);
+
+        $result = $model->getCrossCountMatrix(40, [1, 2], 'f2', 'SA', [1, 2], 'f1', 'SA', [1, 2]);
+
+        $this->assertSame(2, $result['total']);
+        $this->assertSame(1, $result['matrix'][1][2]);
+        $this->assertSame(1, $result['matrix'][2][1]);
+    }
+
     private function injectLegacySchema(RsAnsData $model, LegacyPostgresSchema $legacySchema): void
     {
         $property = new ReflectionProperty(RsAnsData::class, 'legacySchema');
@@ -86,4 +159,3 @@ class RsAnsDataTest extends TestCase
         $property->setValue($model, $legacySchema);
     }
 }
-

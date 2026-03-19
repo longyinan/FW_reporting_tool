@@ -189,4 +189,123 @@ class AnsGraphService
             'pagination' => $result['pagination'],
         ];
     }
+
+    public function showCross(int $ank_id, string $sideQno, string $headQno){
+        $questionList = $this->enqueteService->getQuestionList($ank_id);
+        $sideQuestion = $this->findQuestionByQno($questionList, $sideQno);
+        $headQuestion = $this->findQuestionByQno($questionList, $headQno);
+        if ($sideQuestion === null || $headQuestion === null) {
+            return [];
+        }
+
+        $enquete = $this->prjInfo->get($ank_id);
+        $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
+        $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values()->all();
+
+        $sideQuestions = !empty($sideQuestion['subQuestions']) ? $sideQuestion['subQuestions'] : [$sideQuestion];
+        $headQuestions = !empty($headQuestion['subQuestions']) ? $headQuestion['subQuestions'] : [$headQuestion];
+        $sideGroupName = !empty($sideQuestion['subQuestions']) ? ($sideQuestion['name'] ?? null) : null;
+        $headGroupName = !empty($headQuestion['subQuestions']) ? ($headQuestion['name'] ?? null) : null;
+        $crossTables = [];
+
+        foreach ($sideQuestions as $sideItem) {
+            foreach ($headQuestions as $headItem) {
+                $sideCatNos = collect($sideItem['categories'] ?? [])->pluck('catNo')->map(fn ($catNo) => (int) $catNo)->values()->all();
+                $headCatNos = collect($headItem['categories'] ?? [])->pluck('catNo')->map(fn ($catNo) => (int) $catNo)->values()->all();
+
+                if (($sideItem['qCol'] ?? null) === ($headItem['qCol'] ?? null)) {
+                    continue;
+                }
+
+                $crossData = $this->rsAnsData->getCrossCountMatrix(
+                    $ank_id,
+                    $partsNoList,
+                    (string) ($sideItem['qCol'] ?? ''),
+                    (string) ($sideItem['type'] ?? ''),
+                    $sideCatNos,
+                    (string) ($headItem['qCol'] ?? ''),
+                    (string) ($headItem['type'] ?? ''),
+                    $headCatNos
+                );
+
+                $rows = [];
+                $headCatNames = [];
+                foreach (($headItem['categories'] ?? []) as $headCategory) {
+                    $headCatNames[] = [
+                        'catNo' => (int) ($headCategory['catNo'] ?? 0),
+                        'name' => $headCategory['name'] ?? null,
+                    ];
+                }
+
+                foreach (($sideItem['categories'] ?? []) as $sideCategory) {
+                    $sideCatNo = (int) ($sideCategory['catNo'] ?? 0);
+                    $rowTotal = (int) ($crossData['row_totals'][$sideCatNo] ?? 0);
+                    $cells = [];
+                    foreach (($headItem['categories'] ?? []) as $headCategory) {
+                        $headCatNo = (int) ($headCategory['catNo'] ?? 0);
+                        $count = (int) ($crossData['matrix'][$sideCatNo][$headCatNo] ?? 0);
+                        $cells[] = [
+                            'catNo' => $headCatNo,
+                            'count' => $count,
+                            'rate' => $rowTotal > 0 ? round(($count / $rowTotal) * 100, 1) : 0,
+                        ];
+                    }
+
+                    $rows[] = [
+                        'catNo' => $sideCatNo,
+                        'name' => $sideCategory['name'] ?? null,
+                        'count' => $rowTotal,
+                        'rate' => $rowTotal > 0 ? 100.0 : 0,
+                        'cells' => $cells,
+                    ];
+                }
+
+                $crossTable = [
+                    'sideQCol' => $sideItem['qCol'] ?? null,
+                    'sideName' => $sideItem['name'] ?? null,
+                    'sideGroupName' => $sideGroupName,
+                    'headQCol' => $headItem['qCol'] ?? null,
+                    'headName' => $headItem['name'] ?? null,
+                    'headGroupName' => $headGroupName,
+                    'headCatNames' => $headCatNames,
+                    'total' => (int) ($crossData['total'] ?? 0),
+                    'rows' => $rows,
+                ];
+
+                $crossTables[] = $crossTable;
+            }
+        }
+
+        return $crossTables;
+    }
+
+    private function findQuestionByQno(array $questionList, string $qNo): ?array
+    {
+        foreach ($questionList as $question) {
+            if (($question['qNo'] ?? null) === $qNo && in_array(strtoupper((string) ($question['type'] ?? '')), ['SA', 'MA'], true)) {
+                return $question;
+            }
+
+            if (!empty($question['subQuestions']) && is_array($question['subQuestions'])) {
+                if (($question['qNo'] ?? null) === $qNo) {
+                    $subQuestions = array_values(array_filter(
+                        $question['subQuestions'],
+                        fn (array $subQuestion) => in_array(strtoupper((string) ($subQuestion['type'] ?? '')), ['SA', 'MA'], true)
+                    ));
+
+                    if (!empty($subQuestions)) {
+                        $question['subQuestions'] = $subQuestions;
+                        return $question;
+                    }
+                }
+
+                $found = $this->findQuestionByQno($question['subQuestions'], $qNo);
+                if ($found !== null) {
+                    return $found;
+                }
+            }
+        }
+
+        return null;
+    }
 }
