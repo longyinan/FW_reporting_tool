@@ -123,7 +123,8 @@ class AnsGraphService
                 $partsNoList->all(),
                 $qCol,
                 $type,
-                $catNos
+                $catNos,
+                $question['filter'] ?? null
             );
 
             $total = array_sum($countMap);
@@ -181,7 +182,8 @@ class AnsGraphService
             $partsNoList,
             $targetColumn,
             $page,
-            $perPage
+            $perPage,
+            $data['filter'] ?? null
         );
 
         return [
@@ -190,7 +192,7 @@ class AnsGraphService
         ];
     }
 
-    public function showCross(int $ank_id, string $sideQno, string $headQno){
+    public function showCross(int $ank_id, string $sideQno, string $headQno, ?array $filter = null){
         $questionList = $this->enqueteService->getQuestionList($ank_id);
         $sideQuestion = $this->findQuestionByQno($questionList, $sideQno);
         $headQuestion = $this->findQuestionByQno($questionList, $headQno);
@@ -225,7 +227,8 @@ class AnsGraphService
                     $sideCatNos,
                     (string) ($headItem['qCol'] ?? ''),
                     (string) ($headItem['type'] ?? ''),
-                    $headCatNos
+                    $headCatNos,
+                    $filter
                 );
 
                 $rows = [];
@@ -299,9 +302,10 @@ class AnsGraphService
                     }
                 }
 
-                $found = $this->findQuestionByQno($question['subQuestions'], $qNo);
-                if ($found !== null) {
-                    return $found;
+                foreach ($question['subQuestions'] as $subQuestion) {
+                    if (($subQuestion['qNo'] ?? null) === $qNo && in_array(strtoupper((string) ($subQuestion['type'] ?? '')), ['SA', 'MA'], true)) {
+                        return $subQuestion;
+                    }
                 }
             }
         }

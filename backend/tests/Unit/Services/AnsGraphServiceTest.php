@@ -213,7 +213,8 @@ class AnsGraphServiceTest extends TestCase
             [1, 2],
             'sc1',
             'SA',
-            [1, 2]
+            [1, 2],
+            null
         )->andReturn([
             1 => 3,
             2 => 1,
@@ -243,7 +244,8 @@ class AnsGraphServiceTest extends TestCase
             [3],
             'qg1_1',
             'SA',
-            [1, 2]
+            [1, 2],
+            null
         )->andReturn([
             1 => 2,
             2 => 2,
@@ -253,7 +255,8 @@ class AnsGraphServiceTest extends TestCase
             [3],
             'qg1_2',
             'MA',
-            [1, 2]
+            [1, 2],
+            null
         )->andReturn([
             1 => 3,
             2 => 1,
@@ -279,6 +282,41 @@ class AnsGraphServiceTest extends TestCase
         $this->assertSame(75.0, $result[1]['categories'][0]['rate']);
     }
 
+    public function test_show_graph_passes_filter_to_count_by_question(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $prjInfo->shouldReceive('get')->once()->with(510)->andReturn(new FakeEnquete([4]));
+        $rsAnsData->shouldReceive('countByQuestion')->once()->with(
+            510,
+            [4],
+            'sc2',
+            'SA',
+            [1, 2],
+            ['colname' => 'q1', 'value' => 2]
+        )->andReturn([
+            1 => 4,
+            2 => 2,
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $question = $this->makeGraphQuestion('sc2', 'SC2', 'SA', [1, 2]);
+        $question['filter'] = [
+            'colname' => 'q1',
+            'value' => 2,
+        ];
+
+        $result = $service->showGraph(510, $question);
+
+        $this->assertSame('sc2', $result['qCol']);
+        $this->assertSame(6, $result['total']);
+        $this->assertSame(66.7, $result['categories'][0]['rate']);
+    }
+
     public function test_show_fa_graph_returns_first_page_with_default_pagination(): void
     {
         $prjInfo = Mockery::mock(PrjInfo::class);
@@ -293,7 +331,8 @@ class AnsGraphServiceTest extends TestCase
             [1],
             'sc1_2',
             1,
-            10
+            10,
+            null
         )->andReturn([
             'items' => [
                 ['sample_no' => 1001, 'value' => 'text1'],
@@ -331,7 +370,8 @@ class AnsGraphServiceTest extends TestCase
             [2],
             'qg1_1_1',
             2,
-            20
+            20,
+            null
         )->andReturn([
             'items' => [
                 ['sample_no' => 2021, 'value' => 'fa-a'],
@@ -357,6 +397,46 @@ class AnsGraphServiceTest extends TestCase
         $this->assertSame(2, $result['pagination']['page']);
     }
 
+    public function test_show_fa_graph_passes_filter_to_model(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $prjInfo->shouldReceive('get')->once()->with(710)->andReturn(new FakeEnquete([2]));
+        $rsAnsData->shouldReceive('getFaGraphData')->once()->with(
+            710,
+            [2],
+            'qg1_1_1',
+            1,
+            10,
+            ['colname' => 'q1', 'value' => 3]
+        )->andReturn([
+            'items' => [
+                ['sample_no' => 3001, 'value' => 'fa-x'],
+            ],
+            'pagination' => [
+                'page' => 1,
+                'per_page' => 10,
+                'total' => 1,
+            ],
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showFaGraph(710, [
+            'target_column' => 'qg1_1_1',
+            'filter' => [
+                'colname' => 'q1',
+                'value' => 3,
+            ],
+        ]);
+
+        $this->assertSame(1, $result['pagination']['total']);
+        $this->assertSame('fa-x', $result['items'][0]['value']);
+    }
+
     public function test_show_cross_returns_single_cross_table(): void
     {
         $prjInfo = Mockery::mock(PrjInfo::class);
@@ -380,7 +460,8 @@ class AnsGraphServiceTest extends TestCase
             [1, 2],
             'f1',
             'SA',
-            [1, 2]
+            [1, 2],
+            null
         )->andReturn([
             'matrix' => [
                 1 => [1 => 33, 2 => 9],
@@ -450,7 +531,8 @@ class AnsGraphServiceTest extends TestCase
                 [1, 2],
                 $headQCol,
                 'SA',
-                [1, 2]
+                [1, 2],
+                null
             )->andReturn([
                 'matrix' => [
                     1 => [1 => 1, 2 => 0],
@@ -476,6 +558,53 @@ class AnsGraphServiceTest extends TestCase
         $this->assertSame('HQ1', $result[0]['headName']);
         $this->assertSame('sq2', $result[3]['sideQCol']);
         $this->assertSame('hq2', $result[3]['headQCol']);
+    }
+
+    public function test_show_cross_passes_filter_to_model(): void
+    {
+        $prjInfo = Mockery::mock(PrjInfo::class);
+        $qtpQuotaTable = Mockery::mock(QtpQuotaTable::class);
+        $rsAttribute = Mockery::mock(RsAttribute::class);
+        $rsAnsData = Mockery::mock(RsAnsData::class);
+        $enqueteService = Mockery::mock(EnqueteService::class);
+
+        $questionList = [
+            $this->makeGraphQuestion('f2', 'F2', 'SA', [1, 2]),
+            $this->makeGraphQuestion('f1', 'F1', 'SA', [1, 2]),
+        ];
+
+        $enqueteService->shouldReceive('getQuestionList')->once()->with(910)->andReturn($questionList);
+        $prjInfo->shouldReceive('get')->once()->with(910)->andReturn(new FakeEnquete([1]));
+        $rsAnsData->shouldReceive('getCrossCountMatrix')->once()->with(
+            910,
+            [1],
+            'f2',
+            'SA',
+            [1, 2],
+            'f1',
+            'SA',
+            [1, 2],
+            ['colname' => 'q1', 'value' => 2]
+        )->andReturn([
+            'matrix' => [
+                1 => [1 => 1, 2 => 0],
+                2 => [1 => 0, 2 => 1],
+            ],
+            'row_totals' => [
+                1 => 1,
+                2 => 1,
+            ],
+            'total' => 2,
+        ]);
+
+        $service = new AnsGraphService($prjInfo, $qtpQuotaTable, $rsAttribute, $rsAnsData, $enqueteService);
+        $result = $service->showCross(910, 'F2', 'F1', [
+            'colname' => 'q1',
+            'value' => 2,
+        ]);
+
+        $this->assertCount(1, $result);
+        $this->assertSame(2, $result[0]['total']);
     }
 
     private function makeQuotaTable(string $quotaParam, int $valueType, array $cellValues): object
@@ -543,5 +672,3 @@ class FakeQuotaList extends EloquentCollection
         return $this;
     }
 }
-
-

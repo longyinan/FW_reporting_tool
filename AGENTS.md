@@ -4,6 +4,7 @@
 このリポジトリは Laravel を中心とした単一アプリ構成を対象とします。
 - バックエンド: PHP (Laravel)
 - 実行基盤: Docker Compose / Cloud Run
+- 本システムは、ユーザーの調査アンケート回答データを集計・可視化することを目的とする。
 
 ## 作業方針
 - アプリ本体は `backend/` に集約する。
@@ -16,6 +17,18 @@
 - 中〜高複雑度の業務ロジックは Service / Repository で分離する。
 - 書き込み系エンドポイントは Request Validation を必須とする。
 - API レスポンス形式とエラーコードを統一する。
+
+## アンケート設問データ仕様
+- 設問データ形式は `backend/app/Utils/EqtXmlUtil.php` の実装に準拠する。
+- 通常設問は `question`、設問グループは `qgroup` として扱う。
+- `qgroup` は `subQuestions` を持ち、複数の子設問（`question`）を内包する。
+- 各設問は基本的に `qCol` / `qNo` / `name` / `type` / `categories` を持つ。
+- `type` の代表値は以下:
+  - `sa`: 単一選択
+  - `ma`: 複数選択
+  - `fa`: 自由記述（テキスト）
+  - `nu`: 数値入力
+- 選択肢を持つ設問では `categories` を利用し、必要に応じて `otherFa`（その他入力）を含む。
 
 ## フロントエンド規約
 - 画面は Blade を基本とし、フロント資産は `backend/resources` 配下で管理する。

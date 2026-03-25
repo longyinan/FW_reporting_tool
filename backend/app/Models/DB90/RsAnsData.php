@@ -33,8 +33,14 @@ class RsAnsData extends Model
         return array_column($list, 'relname');
     }
 
-    public function countByQuestion(int $ank_id, array $partsNoList, string $qCol, string $type, array $catNos): array
-    {
+    public function countByQuestion(
+        int $ank_id,
+        array $partsNoList,
+        string $qCol,
+        string $type,
+        array $catNos,
+        ?array $filter = null
+    ): array {
         $countMap = [];
         foreach ($catNos as $catNo) {
             $countMap[(int) $catNo] = 0;
@@ -45,11 +51,16 @@ class RsAnsData extends Model
             return $countMap;
         }
 
+        $query = DB::connection($this->connection)->table(sprintf('%s as target_table', $tableName));
+
+        $qColExpr = sprintf('target_table.%s', $qCol);
+        $this->applyFilterConstraint($query, $ank_id, $partsNoList, $tableName, $filter);
+
         if ($type === 'SA') {
-            $rows = DB::connection($this->connection)->table($tableName)
-                ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
-                ->whereIn($qCol, $catNos)
-                ->groupBy($qCol)
+            $rows = (clone $query)
+                ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qColExpr))
+                ->whereIn($qColExpr, $catNos)
+                ->groupByRaw($qColExpr)
                 ->get();
 
             foreach ($rows as $row) {
@@ -60,11 +71,11 @@ class RsAnsData extends Model
             return $countMap;
         }
 
-        $rows = DB::connection($this->connection)->table($tableName)
-            ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qCol))
-            ->whereNotNull($qCol)
-            ->where($qCol, '<>', '')
-            ->groupBy($qCol)
+        $rows = (clone $query)
+            ->selectRaw(sprintf('%s as answer_value, COUNT(*) as row_count', $qColExpr))
+            ->whereNotNull($qColExpr)
+            ->where($qColExpr, '<>', '')
+            ->groupByRaw($qColExpr)
             ->get();
 
         foreach ($rows as $row) {
@@ -88,7 +99,8 @@ class RsAnsData extends Model
         array $partsNoList,
         string $targetColumn,
         int $page = 1,
-        int $perPage = 10
+        int $perPage = 10,
+        ?array $filter = null
     ): array {
         $tableName = $this->findTableByColumn($ank_id, $partsNoList, $targetColumn);
         $page = max($page, 1);
@@ -105,11 +117,12 @@ class RsAnsData extends Model
             ];
         }
 
-        $baseQuery = DB::connection($this->connection)->table($tableName)
-            ->selectRaw(sprintf('sample_no, %s as answer_value', $targetColumn))
-            ->whereNotNull('sample_no')
-            ->orderBy('sample_no')
+        $baseQuery = DB::connection($this->connection)->table(sprintf('%s as target_table', $tableName))
+            ->selectRaw(sprintf('target_table.sample_no as sample_no, target_table.%s as answer_value', $targetColumn))
+            ->whereNotNull(sprintf('target_table.%s', $targetColumn))
+            ->orderBy('target_table.sample_no')
             ;
+        $this->applyFilterConstraint($baseQuery, $ank_id, $partsNoList, $tableName, $filter);
         $total = (clone $baseQuery)->count();
         $rows = $baseQuery->forPage($page, $perPage)->get();
 
@@ -134,7 +147,8 @@ class RsAnsData extends Model
         array $sideCatNos,
         string $headQCol,
         string $headType,
-        array $headCatNos
+        array $headCatNos,
+        ?array $filter = null
     ): array {
         $matrix = [];
         $rowTotals = [];
@@ -156,7 +170,24 @@ class RsAnsData extends Model
             ];
         }
 
-        $answerPairs = $this->getCrossAnswerPairs($sideTable, $sideQCol, $headTable, $headQCol);
+        $filterTable = null;
+        $filterCol = null;
+        $filterValue = null;
+        if ($filter !== null) {
+            $filterCol = (string) $filter['colname'];
+            $filterValue = (int) $filter['value'];
+            $filterTable = $this->findTableByColumn($ank_id, $partsNoList, $filterCol);
+        }
+
+        $answerPairs = $this->getCrossAnswerPairs(
+            $sideTable,
+            $sideQCol,
+            $headTable,
+            $headQCol,
+            $filterTable,
+            $filterCol,
+            $filterValue
+        );
         foreach ($answerPairs as $answerPair) {
             $sideSelected = $this->extractSelectedCatNos($answerPair['side_value'] ?? null, $sideType, $sideCatNos);
             $headSelected = $this->extractSelectedCatNos($answerPair['head_value'] ?? null, $headType, $headCatNos);
@@ -193,19 +224,42 @@ class RsAnsData extends Model
         return null;
     }
 
-    private function getCrossAnswerPairs(string $sideTable, string $sideQCol, string $headTable, string $headQCol): array
+    private function getCrossAnswerPairs(
+        string $sideTable,
+        string $sideQCol,
+        string $headTable,
+        string $headQCol,
+        ?string $filterTable = null,
+        ?string $filterCol = null,
+        ?int $filterValue = null
+    ): array
     {
-        if ($sideTable === $headTable) {
-            $builder = DB::connection($this->connection)->table($sideTable);
-            $sampleNoColumn = 'sample_no';
-        } else {
-            $builder = DB::connection($this->connection)->table(sprintf('%s as side_table', $sideTable))
-                ->join(sprintf('%s as head_table', $headTable), 'side_table.sample_no', '=', 'head_table.sample_no');
-            $sampleNoColumn = 'side_table.sample_no';
+        $builder = DB::connection($this->connection)->table(sprintf('%s as side_table', $sideTable));
+        $sampleNoColumn = 'side_table.sample_no';
+        $headValueExpr = sprintf('side_table.%s', $headQCol);
+
+        if ($sideTable !== $headTable) {
+            $builder->join(sprintf('%s as head_table', $headTable), 'side_table.sample_no', '=', 'head_table.sample_no');
+            $headValueExpr = sprintf('head_table.%s', $headQCol);
+        }
+
+        if ($filterTable !== null && $filterCol !== null && $filterValue !== null) {
+            if ($filterTable === $sideTable) {
+                $builder->where(sprintf('side_table.%s', $filterCol), '=', $filterValue);
+            } elseif ($filterTable === $headTable && $sideTable !== $headTable) {
+                $builder->where(sprintf('head_table.%s', $filterCol), '=', $filterValue);
+            } else {
+                $builder->join(
+                    sprintf('%s as filter_table', $filterTable),
+                    'side_table.sample_no',
+                    '=',
+                    'filter_table.sample_no'
+                )->where(sprintf('filter_table.%s', $filterCol), '=', $filterValue);
+            }
         }
 
         return $builder
-            ->selectRaw(sprintf('%s as side_value, %s as head_value', $sideQCol, $headQCol))
+            ->selectRaw(sprintf('side_table.%s as side_value, %s as head_value', $sideQCol, $headValueExpr))
             ->whereNotNull($sampleNoColumn)
             ->get()
             ->map(fn ($row) => [
@@ -247,4 +301,32 @@ class RsAnsData extends Model
 
         return $this->legacySchema;
     }
+
+    private function applyFilterConstraint($query, int $ank_id, array $partsNoList, string $targetTable, ?array $filter): void
+    {
+        if ($filter === null) {
+            return;
+        }
+
+        $filterCol = (string) $filter['colname'];
+        $filterTable = $this->findTableByColumn($ank_id, $partsNoList, $filterCol);
+        if ($filterTable === null) {
+            return;
+        }
+
+        $filterValue = (int) $filter['value'];
+
+        if ($filterTable === $targetTable) {
+            $query->where(sprintf('target_table.%s', $filterCol), '=', $filterValue);
+            return;
+        }
+
+        $query->join(
+            sprintf('%s as filter_table', $filterTable),
+            'target_table.sample_no',
+            '=',
+            'filter_table.sample_no'
+        )->where(sprintf('filter_table.%s', $filterCol), '=', $filterValue);
+    }
+
 }

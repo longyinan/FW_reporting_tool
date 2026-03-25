@@ -14,8 +14,11 @@ class ShowCrossRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'sideQno' => ['required', 'string'],
-            'headQno' => ['required', 'string'],
+            'sideQno' => ['required', 'string', 'regex:/^[A-Z]+[A-Z0-9_]*[A-Z0-9]?$/'],
+            'headQno' => ['required', 'string', 'regex:/^[A-Z]+[A-Z0-9_]*[A-Z0-9]?$/'],
+            'filter' => ['nullable', 'array'],
+            'filter.colname' => ['required_with:filter', 'string', 'regex:/^[a-z]+[a-z0-9_]*[a-z0-9]?$/'],
+            'filter.value' => ['required_with:filter', 'integer'],
         ];
     }
 }

@@ -31,7 +31,8 @@ class AnsGraphController extends Controller
         return $this->ansGraphService->showCross(
             $ank_id,
             $request->validated('sideQno'),
-            $request->validated('headQno')
+            $request->validated('headQno'),
+            $request->validated('filter')
         );
     }
 }
