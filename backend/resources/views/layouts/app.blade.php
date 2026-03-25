@@ -9,7 +9,7 @@
         @stack('head')
     </head>
     <body class="min-h-screen bg-gray-100 text-gray-900 antialiased">
-        <main class="mx-auto w-full max-w-4xl p-6">
+        <main class="mx-auto w-full max-w-6xl p-6">
             @yield('content')
         </main>
         @stack('scripts')
