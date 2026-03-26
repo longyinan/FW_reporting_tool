@@ -89,8 +89,63 @@
                 </table>
 
 
+                <div class="horizontal-spacer"></div>
+                <div  v-if="displayStatus">
+                    <table>
+                        <tbody>
+                        <tr>
+                            <th style="width: 300px">設問</th>
+                            <th>
+                                <select
+                                    style="width: 80%"
+                                    class="select-default"
+                                    v-model="selectedQCol"
+                                >
+                                    <option value="">--設問--</option>
+                                    <option
+                                        v-for="(item, optIdx) in getQuestionOptions(questionList)"
+                                        :key="optIdx"
+                                        :value="item.qCol"
+                                    >
+                                        {{ item.qNo }}({{item.type}}) {{ item.name }}
+                                    </option>
+                                </select>
+                            </th>
+                        </tr>
+                        <tr>
+                            <th>カテゴリー</th>
+                            <th>
+                                <select
+                                    style="width: 80%"
+                                    class="select-default"
+                                    v-model="selectedCategory"
+                                    :disabled="!selectedQCol"
+                                >
+                                    <option value="">--カテゴリ--</option>
+                                    <option
+                                        v-for="(cat, catIdx) in currentCategories"
+                                        :key="catIdx"
+                                        :value="cat.catNo"
+                                    >
+                                        {{ cat.name }}
+                                    </option>
+                                </select>
+                            </th>
+                        </tr>
+                        </tbody>
 
-
+                    </table>
+                    <div style="margin-top: 12px; display: flex; justify-content: space-between;">
+                        <button
+                            class="btn-clear cross-btn"
+                            @click="resetFilter"
+                        >リセット</button>
+                        <button
+                            class="btn-primary cross-btn"
+                            @click="applyFilter"
+                        >フィルタ</button>
+                    </div>
+                </div>
                 <div class="horizontal-spacer"></div>
                 <h2 class="medium" id="displayAnswerDataTitle">
                     <span style="text-transform: capitalize">設問</span>
@@ -830,6 +885,9 @@ const {
     surveyTitle,
     loading,
     totalRejectCount,
+    currentCategories,  // ← 追加
+    selectedQCol,       // ← 追加
+    selectedCategory,   // ← 追加
     getCrossOptions,
     displayAnswerData,
     changePage,
@@ -841,7 +899,10 @@ const {
     openModal,
     closeModal,
     showModal,
-    crossInfo
+    crossInfo,
+    getQuestionOptions,
+    resetFilter,
+    applyFilter
 } = useSurveyGraph();
 
 // マウント時に初期化

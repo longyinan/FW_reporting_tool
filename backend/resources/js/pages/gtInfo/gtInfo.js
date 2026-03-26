@@ -1,5 +1,5 @@
 // survey-graph.js
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import axios from 'axios';
 
 // コンポーネントで使用する変数と関数をすべてエクスポート
@@ -13,6 +13,16 @@ export default function useSurveyGraph() {
     const loading = ref(false);
     const showModal  = ref(false);
     const crossInfo =   ref([]);
+    const selectedQCol = ref('');       // 选中した設問 qCol
+    const selectedCategory = ref('');   // 选中したカテゴリ
+
+    const selectedQColSave = ref('');
+    const selectedCategorySave = ref('');
+
+    const resetFilter = () => {
+        selectedQCol.value = '';
+        selectedCategory.value = '';
+    };
     // 2. 定数定義
     const appEl = document.getElementById('app');
     const id = appEl?.dataset.id || '';
@@ -22,6 +32,11 @@ export default function useSurveyGraph() {
     const requestInfoUrl = `${url}/ansGraph/${id}`;
     const requestShowCrossUrl = `${url}/api/ansGraph/${id}/showCross`;
 
+    watch(selectedQCol, (newVal) => {
+        if (newVal === '') {
+            selectedCategory.value = '';
+        }
+    });
     // 3. コア関数 - 基本データを取得
     const fetchData = async () => {
         try {
@@ -51,6 +66,14 @@ export default function useSurveyGraph() {
         return total > 0 ? total : '-';
     });
 
+    const currentCategories = computed(() => {
+        if (!selectedQCol.value) return [];
+
+        const allQuestions = getQuestionOptions(questionList.value);
+        const target = allQuestions.find(q => q.qCol === selectedQCol.value);
+        return target?.categories || [];
+    });
+
     // 5. 補助関数 - クロス集計オプションを取得
     const getCrossOptions = (questionList, currentQuestion) => {
         return Array.isArray(questionList)
@@ -65,7 +88,10 @@ export default function useSurveyGraph() {
     };
 
     // 6. コア関数 - 回答データを表示
-    const displayAnswerData = async () => {
+    const displayAnswerData = async (filter={
+        'colname':'',
+        'value':''
+    }) => {
         displayStatus.value = true;
 
         if (questionList.value && questionList.value.length > 0) {
@@ -77,12 +103,19 @@ export default function useSurveyGraph() {
                             'page': 1,
                             'per_page': 10,
                         };
+                        if(filter.colname){
+                            faData.filter=filter;
+                        }
+
                         handleQuestionRequest(faData, requestFaUrl).then(res => {
                             categorie.items = res.items;
                             categorie.pagination = res.pagination;
                         });
                     });
                 } else {
+                    if(filter.colname){
+                        question.filter=filter;
+                    }
                     handleQuestionRequest(question, requestUrl).then(res => {
                         if (question.type == 'SA' || question.type == 'MA') {
                             const targetQuestion = questionList.value.find(item => item.qCol === res.qCol);
@@ -116,6 +149,9 @@ export default function useSurveyGraph() {
                                             'page': 1,
                                             'per_page': 10,
                                         };
+                                        if(filter.colname){
+                                            faData.filter=filter;
+                                        }
                                         handleQuestionRequest(faData, requestFaUrl).then(res => {
                                             categorie.items = res.items;
                                             categorie.pagination = res.pagination;
@@ -130,6 +166,9 @@ export default function useSurveyGraph() {
                                                     'page': 1,
                                                     'per_page': 10,
                                                 };
+                                                if(filter.colname){
+                                                    faData.filter=filter;
+                                                }
                                                 handleQuestionRequest(faData, requestFaUrl).then(res => {
                                                     other.items = res.items;
                                                     other.pagination = res.pagination;
@@ -151,6 +190,9 @@ export default function useSurveyGraph() {
                                         'page': 1,
                                         'per_page': 10,
                                     };
+                                    if(filter.colname){
+                                        faData.filter=filter;
+                                    }
                                     handleQuestionRequest(faData, requestFaUrl).then(res => {
                                         other.items = res.items;
                                         other.pagination = res.pagination;
@@ -206,7 +248,12 @@ export default function useSurveyGraph() {
                     'per_page': pagination.per_page || 10,
                 };
             }
-
+            if(selectedQColSave.value){
+                faData.filter = {
+                    'colname':selectedQColSave.value,
+                    'value':selectedCategorySave.value
+                }
+            }
             const response = await axios.post(
                 requestFaUrl,
                 faData,
@@ -294,6 +341,27 @@ export default function useSurveyGraph() {
             loading.value = false;
         }
     };
+
+    const getQuestionOptions = (questionList) => {
+        const result = [];
+
+
+        questionList.forEach(question => {
+            const { type, subQuestions } = question;
+            if (type === 'SA' || type === 'MA') {
+                result.push(question);
+            }
+            else if (type !== 'FA' && type !== 'NU' && subQuestions && subQuestions.length) {
+                subQuestions.forEach(sub => {
+                    if (sub.type === 'SA' || sub.type === 'MA') {
+                        result.push(sub);
+                    }
+                });
+            }
+        });
+
+        return result;
+    };
     const openModal =  () => {
         showModal.value=true;
     }
@@ -301,6 +369,29 @@ export default function useSurveyGraph() {
     const closeModal =  () => {
         showModal.value=false;
     }
+
+    // フィルタボタン：選択した設問とカテゴリを取得
+    const applyFilter = () => {
+        // 取得したい値
+        const qCol = selectedQCol.value;
+        const catNo = selectedCategory.value;
+
+        const hasBoth = qCol && catNo;
+        const hasNone = !qCol && !catNo;
+
+        if (!hasBoth && !hasNone) {
+            alert('設問とカテゴリを両方選択してください。');
+            return;
+        }
+        displayAnswerData({
+            'colname':qCol,
+            'value':catNo,
+
+        })
+        selectedQColSave.value = qCol;
+        selectedCategorySave.value = catNo;
+
+    };
     // コンポーネントで使用する変数とメソッドをすべてエクスポート
     return {
         displayStatus,
@@ -310,6 +401,9 @@ export default function useSurveyGraph() {
         surveyTitle,
         loading,
         totalRejectCount,
+        currentCategories,
+        selectedQCol,
+        selectedCategory,
         getCrossOptions,
         displayAnswerData,
         changePage,
@@ -321,6 +415,9 @@ export default function useSurveyGraph() {
         openModal,
         closeModal,
         showModal,
-        crossInfo
+        crossInfo,
+        getQuestionOptions,
+        resetFilter,
+        applyFilter
     };
 }
