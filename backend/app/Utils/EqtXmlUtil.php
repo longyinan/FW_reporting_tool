@@ -33,20 +33,29 @@ class EqtXmlUtil
         if($this->questionList) return $this->questionList;
 
         $questionList = [];
+        $pageNum = 0;
 		foreach( $this->xml_strc->structure[0] as $item ) {
 			switch( $item->getName() ) {
+                case 'pagebreak':
+                    $pageNum++;
+                    break;
 				case 'question':
-                    $questionList[] = $this->analysisQuestionXmltoArr($item);
+                    $question = $this->analysisQuestionXmltoArr($item);
+                    $question['page'] = $pageNum;
+                    $questionList[] = $question;
                     break;
 				case 'qgroup':
                     $question = [
                         'type' => $item->property->type->__toString(),
                         'qNo' => $item->property->qNo->__toString(),
                         'name' => $this->_filter_questionqno($item->property->name),
+                        'page' => $pageNum,
                         'subQuestions' => [],
                     ];
                     foreach($item->question as $sub_question){
-                        $question['subQuestions'][] = $this->analysisQuestionXmltoArr($sub_question);
+                        $subQuestion = $this->analysisQuestionXmltoArr($sub_question);
+                        $subQuestion['page'] = $pageNum;
+                        $question['subQuestions'][] = $subQuestion;
                     }
                     $questionList[] = $question;
                     break;
