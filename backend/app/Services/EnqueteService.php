@@ -60,4 +60,20 @@ class EnqueteService
         }
         return $questionList;
     }
+
+
+    public function getQuestionListNoGroup($questionList){
+        $newQustionList = [];
+        foreach ($questionList as $v){
+            if(!in_array($v['type'],['MA','FA','NU','SA']) ){
+                foreach ($v['subQuestions'] as $v1){
+                    $newQustionList[] = $v1;
+                }
+            }else{
+                $newQustionList[] = $v;
+            }
+        }
+
+        return $newQustionList;
+    }
 }

@@ -10,4 +10,9 @@ class GtInfoController extends Controller
 
         return view('pages.gtInfo', ['id' => $id]);
     }
+
+    public function ankConfirm($id){
+
+        return view('pages.ankConfirm', ['id' => $id]);
+    }
 }

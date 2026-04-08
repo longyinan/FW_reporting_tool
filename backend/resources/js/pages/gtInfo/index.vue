@@ -790,10 +790,7 @@
 
             </div>
         </div>
-        <!-- ローディング表示 -->
-        <div v-if="loading" class="loading-mask">
-            <div class="loading-spinner"></div>
-        </div>
+        <GlobalLoading :visible="loading" />
     </div>
     <!-- ポップアップコード -->
     <!-- ポップアップマスクレイヤー -->
@@ -875,7 +872,7 @@
 <script setup>
 import useSurveyGraph from './gtInfo.js';
 import { onMounted, onUnmounted } from 'vue';
-
+import GlobalLoading from './common.vue'
 // 必要な変数とメソッドを展開
 const {
     displayStatus,

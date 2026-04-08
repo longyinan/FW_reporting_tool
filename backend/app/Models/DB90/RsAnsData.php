@@ -328,5 +328,76 @@ class RsAnsData extends Model
             'filter_table.sample_no'
         )->where(sprintf('filter_table.%s', $filterCol), '=', $filterValue);
     }
+    public function findSample(
+        int $ank_id,
+        array $partsNoList,
+         $sampleNos='',
+        int $sort = 1,
+        array $conditionRes = [],
+        int $page = 1,
+        int $per_page = 20
 
+    ): array {
+        $tableList = [];
+        $joinIndex = 1;
+
+        foreach ($partsNoList as $partNo) {
+            $tableList[] = $this->getExistTableList($ank_id, (int)$partNo);
+            $mainTable = "rs_attribute_{$ank_id}_{$partNo}";
+        }
+
+        $baseQuery = DB::connection($this->connection)
+            ->table($mainTable . ' AS main')
+            ->selectRaw('main.sample_no, to_char(main.update_date, \'YYYY-MM-DD HH24:MI:SS\') as update_date');
+
+        foreach ($tableList as $k => $v) {
+            foreach ($v as $k1 => $v1) {
+                $alias = 'rs_' . $joinIndex++;
+
+                $baseQuery->join(
+                    DB::raw($v1 . ' AS ' . $alias),
+                    $alias . '.sample_no',
+                    '=',
+                    'main.sample_no'
+                );
+            }
+        }
+        if($sampleNos){
+            $arrSamp = explode(",", $sampleNos);
+            $baseQuery->whereIn('main.sample_no', $arrSamp);
+        }
+        foreach ($conditionRes as $condition) {
+            $baseQuery->whereRaw('(' . $condition . ')');
+        }
+        if ($sort == 1) {
+            $baseQuery->orderBy('main.sample_no', 'asc');
+        } else {
+            $baseQuery->orderBy('main.sample_no', 'desc');
+        }
+        $total = (clone $baseQuery)->count();
+        $rows = $baseQuery->forPage($page, $per_page)->get();
+        if($rows){
+            return [
+                'items' => $rows->map(fn ($row) => [
+                    'sample_no' => $row->sample_no,
+                    'update_date' => $row->update_date,
+                ])->toArray(),
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $per_page,
+                    'total' => $total,
+                ],
+            ];
+        }else{
+            return [
+                'items' => [],
+                'pagination' => [
+                    'page' => $page,
+                    'per_page' => $per_page,
+                    'total' => 0,
+                ],
+            ];
+        }
+
+    }
 }

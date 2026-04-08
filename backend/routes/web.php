@@ -17,3 +17,5 @@ Route::get('/ansGraph/{id}', [AnsGraphController::class, 'index'])->where('id', 
 
 
 Route::get('/gtInfo/{id}', [GtInfoController::class, 'index']);
+
+Route::get('/ankConfirm/{id}', [GtInfoController::class, 'ankConfirm']);

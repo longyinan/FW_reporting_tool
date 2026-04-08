@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ShowAnkConfirmRequest;
 use App\Http\Requests\ShowGraphRequest;
 use App\Http\Requests\ShowFaGraphRequest;
 use App\Http\Requests\ShowCrossRequest;
@@ -33,6 +34,14 @@ class AnsGraphController extends Controller
             $request->validated('sideQno'),
             $request->validated('headQno'),
             $request->validated('filter')
+        );
+    }
+
+    public function ShowAnkConfirm(ShowAnkConfirmRequest $request, int $ank_id)
+    {
+        return $this->ansGraphService->ShowAnkConfirm(
+            $ank_id,
+            $request->all()
         );
     }
 }

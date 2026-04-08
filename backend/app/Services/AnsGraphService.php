@@ -6,6 +6,8 @@ use App\Models\DB10\PrjInfo;
 use App\Models\DB10\QtpQuotaTable;
 use App\Models\DB90\RsAnsData;
 use App\Models\DB90\RsAttribute;
+use App\Utils\CodeConvertorUtils;
+use App\Utils\ConditionUtils;
 
 class AnsGraphService
 {
@@ -312,4 +314,97 @@ class AnsGraphService
 
         return null;
     }
+    public function ShowAnkConfirm(int $ank_id,array $data = null){
+
+
+        $enquete = $this->prjInfo->get($ank_id);
+        $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
+        $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values();
+        $questionList = $this->enqueteService->getQuestionListNoGroup($this->enqueteService->getQuestionList($ank_id));
+        $conditionRes = [];
+        $condition = trim($data['condition']);
+        if($condition){
+            $conditionArr = explode("\n",$condition);
+            $codeConvertor = new CodeConvertorUtils($questionList);
+            $err=[];
+            foreach ($conditionArr as $v){
+                if(!$this->checkConditionValid($v)){
+                    $err[] = $v;
+                }
+            }
+            if($err){
+                $message = '条件式不正：'.implode('、', $err);
+
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'condition' => [$message],
+                ]);
+            }
+            foreach ($conditionArr as $v){
+                $conditionRes[] = $codeConvertor->convert($v);
+            }
+            $err=[];
+            foreach ($conditionRes as $k=>$v){
+                if(!$v){
+                    $err[]=$conditionArr[$k];
+                }
+            }
+            if($err){
+                $message = '条件式不正：'.implode('、', $err);
+
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'condition' => [$message],
+                ]);
+            }
+
+        }
+        if($data['page']??null && $data['per_page']??null){
+            return $this->rsAnsData->findSample($ank_id,$partsNoList->all(),$data['sampleNos'],$data['sort'],$conditionRes,$data['page'],$data['per_page']);
+        }else{
+            return $this->rsAnsData->findSample($ank_id,$partsNoList->all(),$data['sampleNos'],$data['sort'],$conditionRes);
+        }
+
+    }
+
+
+    private function checkConditionValid($condition)
+    {
+        // 空条件算合法
+        $condition = trim($condition);
+        if ($condition === '') {
+            return true;
+        }
+
+        $lines = explode("\n", $condition);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '') continue;
+
+            if (!preg_match('/\[[^\]]+\]\s*[=!<>]+\s*.+/', $line)) {
+                return false;
+            }
+
+            if (!preg_match('/^\s*\[[^\]]+\]/', $line)) {
+                return false;
+            }
+
+            if (!preg_match('/\s+(!=|=|>=|<=|>|<)\s+/', $line)) {
+                return false;
+            }
+
+            if (preg_match('/\{.*[,|&:].*[,|&:].*\}/', $line)) {
+                return false;
+            }
+            $hasAnd = stripos($line, 'and') !== false;
+            $hasOr  = stripos($line, 'or') !== false;
+            if ($hasAnd && $hasOr) {
+                if (!str_contains($line, '(') || !str_contains($line, ')')) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
 }

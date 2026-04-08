@@ -1,5 +1,5 @@
 // survey-graph.js
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
+import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 
 // コンポーネントで使用する変数と関数をすべてエクスポート
@@ -8,6 +8,7 @@ export default function useSurveyGraph() {
     const displayStatus = ref(false);
     const quotaList = ref([]);
     const questionList = ref([]);
+    const questionListDef = ref([]);
     const researchNo = ref('');
     const surveyTitle = ref('');
     const loading = ref(false);
@@ -46,7 +47,9 @@ export default function useSurveyGraph() {
             researchNo.value = data.enquete.nxs_ank_name;
             surveyTitle.value = data.enquete.nxs_enquete_name;
             quotaList.value = data.quotaList;
-            questionList.value = data.questionList;
+            questionList.value = structuredClone(data.questionList);
+            ;
+            questionListDef.value = structuredClone(data.questionList);;
         } catch (error) {
             console.error('データリクエストに失敗しました:', error);
             alert('データの読み込みに失敗しました');
@@ -383,6 +386,7 @@ export default function useSurveyGraph() {
             alert('設問とカテゴリを両方選択してください。');
             return;
         }
+        questionList.value = questionListDef.value
         displayAnswerData({
             'colname':qCol,
             'value':catNo,
