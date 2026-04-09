@@ -400,4 +400,40 @@ class RsAnsData extends Model
         }
 
     }
+
+    public function findSampleOne(
+        int $ank_id,
+        array $partsNoList,
+        $sampleNos='',
+    ): array {
+        $tableList = [];
+        $joinIndex = 1;
+
+        foreach ($partsNoList as $partNo) {
+            $tableList[] = $this->getExistTableList($ank_id, (int)$partNo);
+            $mainTable = "rs_attribute_{$ank_id}_{$partNo}";
+        }
+
+        $baseQuery = DB::connection($this->connection)
+            ->table($mainTable . ' AS main')
+            ->selectRaw('*');
+
+        foreach ($tableList as $k => $v) {
+            foreach ($v as $k1 => $v1) {
+                $alias = 'rs_' . $joinIndex++;
+
+                $baseQuery->join(
+                    DB::raw($v1 . ' AS ' . $alias),
+                    $alias . '.sample_no',
+                    '=',
+                    'main.sample_no'
+                );
+            }
+        }
+        $baseQuery->where('main.sample_no', $sampleNos);
+
+        $rows = $baseQuery->first();
+        return $rows ? (array)$rows : [];
+
+    }
 }

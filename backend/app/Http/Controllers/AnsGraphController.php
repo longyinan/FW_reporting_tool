@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ShowAnkConfirmIndex;
 use App\Http\Requests\ShowAnkConfirmRequest;
 use App\Http\Requests\ShowGraphRequest;
 use App\Http\Requests\ShowFaGraphRequest;
@@ -40,6 +41,14 @@ class AnsGraphController extends Controller
     public function ShowAnkConfirm(ShowAnkConfirmRequest $request, int $ank_id)
     {
         return $this->ansGraphService->ShowAnkConfirm(
+            $ank_id,
+            $request->all()
+        );
+    }
+
+    public function ShowAnkIndex(ShowAnkConfirmIndex $request, int $ank_id)
+    {
+        return $this->ansGraphService->ShowAnkIndex(
             $ank_id,
             $request->all()
         );

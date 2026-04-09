@@ -407,4 +407,107 @@ class AnsGraphService
         return true;
     }
 
+    public function ShowAnkIndex(int $ank_id,array $data = null){
+        $questionList = $this->enqueteService->getQuestionList($ank_id);
+        $enquete = $this->prjInfo->get($ank_id);
+        $enquete->load(['eqtInfos:nxs_ank_book_seq,nxs_enquete_no']);
+        $partsNoList = $enquete->eqtInfos->pluck('nxs_enquete_no')->values();
+        $dataInfo =  $this->rsAnsData->findSampleOne($ank_id,$partsNoList->all(),$data['sampleNo']);
+        if(!$dataInfo){
+            return [];
+        }
+        foreach ($questionList as $k=> $v){
+            $data = [];
+            if(in_array($v['type'],['SA','FA','MA','NU'])){
+                switch ($v['type']){
+                    case 'SA':
+                        if($dataInfo[$v['qCol']]){
+
+                            $data[] =[
+                                'catNo'=> $v['categories'][$dataInfo[$v['qCol']]-1]['catNo'],
+                                'answer'=>$v['categories'][$dataInfo[$v['qCol']]-1]['name'],
+                            ];
+                        }
+                        break;
+                    case 'MA':
+                        if($dataInfo[$v['qCol']]){
+                            $arr = str_split($dataInfo[$v['qCol']]);
+                            foreach ($arr as $k1=>$v1){
+                                if($v1 ==1){
+                                    $data[] = [
+                                        'catNo'=> $v['categories'][$k1]['catNo'],
+                                        'answer'=>$v['categories'][$k1]['name'],
+                                    ];
+                                }
+                            }
+                        }
+                        break;
+                    case 'FA':
+                    case 'NU':
+                        foreach ($v['categories'] as $v1){
+                            if($dataInfo[$v['qCol'].'_'.$v1['catNo']]){
+                                $data[] = [
+                                    'catNo'=> $v1['catNo'],
+                                    'answer'=>$dataInfo[$v['qCol'].'_'.$v1['catNo']],
+                                ];
+
+                            }
+
+                        }
+                        break;
+
+                }
+                $questionList[$k]['answers']= $data ;
+            }else{
+                foreach ($v['subQuestions'] as $k1=>$v1){
+                    switch ($v1['type']){
+                        case 'SA':
+                            if($dataInfo[$v1['qCol']]){
+
+                                $data[] =[
+                                    'catNo'=> $v1['categories'][$dataInfo[$v1['qCol']]-1]['catNo'],
+                                    'answer'=>$v1['categories'][$dataInfo[$v1['qCol']]-1]['name'],
+                                ];
+                            }
+                            break;
+                        case 'MA':
+                            if($dataInfo[$v1['qCol']]){
+                                $arr = str_split($dataInfo[$v1['qCol']]);
+                                foreach ($arr as $k2=>$v2){
+                                    if($v2 ==1){
+                                        $data[] = [
+                                            'catNo'=> $v1['categories'][$k2]['catNo'],
+                                            'answer'=>$v1['categories'][$k2]['name'],
+                                        ];
+                                    }
+                                }
+                            }
+                            break;
+                        case 'FA':
+                        case 'NU':
+                            foreach ($v1['categories'] as $v2){
+                                if($dataInfo[$v1['qCol'].'_'.$v2['catNo']]){
+                                    $data[] = [
+                                        'catNo'=> $v2['catNo'],
+                                        'answer'=>$dataInfo[$v1['qCol'].'_'.$v2['catNo']],
+                                    ];
+
+                                }
+
+                            }
+                            break;
+
+                    }
+                    $questionList[$k]['subQuestions'][$k1]['answers']= $data ;
+
+
+                }
+
+
+            }
+
+        }
+        return $questionList;
+
+    }
 }

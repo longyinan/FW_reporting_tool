@@ -22,3 +22,4 @@ Route::post('/ansGraph/{ank_id}/showCross', [AnsGraphController::class, 'showCro
 
 Route::post('/ansGraph/{ank_id}/showAnkConfirm', [AnsGraphController::class, 'showAnkConfirm'])->where('ank_id', '[0-9]+');
 
+Route::post('/ansGraph/{ank_id}/showAnkIndex', [AnsGraphController::class, 'showAnkIndex'])->where('ank_id', '[0-9]+');
